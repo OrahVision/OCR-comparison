@@ -105,6 +105,11 @@ class OCRBrowser(tk.Tk):
         self.btn_goto = ttk.Button(self.toolbar, text="Go", command=self.goto_image)
         self.btn_goto.pack(side=tk.LEFT, padx=2)
 
+        # Export button
+        ttk.Separator(self.toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        self.btn_export = ttk.Button(self.toolbar, text="Export Results", command=self.export_results)
+        self.btn_export.pack(side=tk.LEFT, padx=2)
+
         # Provider selector
         ttk.Label(self.toolbar, text="Provider:").pack(side=tk.LEFT, padx=(30, 5))
         self.provider_var = tk.StringVar()
@@ -405,6 +410,91 @@ class OCRBrowser(tk.Tk):
         """Handle provider selection change."""
         self.current_provider = self.provider_var.get()
         self._display_ocr_result()
+
+    def export_results(self):
+        """Export OCR results to a text file."""
+        if not self.images:
+            messagebox.showwarning("No Data", "No images loaded to export")
+            return
+
+        # Ask user what to export
+        choice = messagebox.askyesnocancel(
+            "Export Options",
+            "Export ALL images?\n\n"
+            "Yes = Export all images\n"
+            "No = Export current image only\n"
+            "Cancel = Abort"
+        )
+
+        if choice is None:  # Cancel
+            return
+
+        export_all = choice
+
+        # Ask for file location
+        default_name = "ocr_results_all.txt" if export_all else f"ocr_result_{self.current_index + 1}.txt"
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            initialfile=default_name,
+            title="Save OCR Results"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            self.status_bar.config(text="Exporting...")
+            self.update_idletasks()
+
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write("=" * 80 + "\n")
+                f.write("OCR RESULTS EXPORT\n")
+                f.write("=" * 80 + "\n\n")
+
+                images_to_export = self.images if export_all else [self.images[self.current_index]]
+
+                for i, image_data in enumerate(images_to_export):
+                    image_id = image_data['id']
+                    image_path = image_data['path']
+
+                    f.write("-" * 80 + "\n")
+                    f.write(f"IMAGE {i + 1}: {image_path}\n")
+                    f.write("-" * 80 + "\n\n")
+
+                    # Get all OCR results for this image
+                    results = self.db.get_all_ocr_results_for_image(image_id)
+
+                    if not results:
+                        f.write("  (No OCR results available)\n\n")
+                        continue
+
+                    for result in results:
+                        provider = result['provider']
+                        f.write(f">>> PROVIDER: {provider.upper()}\n")
+                        f.write(f"    Confidence: {result['confidence']:.1%}\n")
+                        f.write(f"    Words: {result['word_count']}\n")
+                        f.write(f"    Processing time: {result['processing_time_ms']:.0f}ms\n")
+
+                        if result['success']:
+                            f.write(f"    Status: Success\n")
+                            f.write("\n--- TEXT START ---\n")
+                            f.write(result['text'])
+                            f.write("\n--- TEXT END ---\n\n")
+                        else:
+                            f.write(f"    Status: FAILED - {result.get('error', 'Unknown error')}\n\n")
+
+                f.write("=" * 80 + "\n")
+                f.write("END OF EXPORT\n")
+                f.write("=" * 80 + "\n")
+
+            count = len(images_to_export)
+            self.status_bar.config(text=f"Exported {count} image(s) to {os.path.basename(file_path)}")
+            messagebox.showinfo("Export Complete", f"Exported {count} image(s) to:\n{file_path}")
+
+        except Exception as e:
+            self.status_bar.config(text="Export failed")
+            messagebox.showerror("Export Error", f"Failed to export: {e}")
 
     def read_aloud(self):
         """Read current OCR text aloud using TTS."""

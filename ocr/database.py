@@ -210,6 +210,24 @@ class OCRDatabase:
         """, (image_id, provider))
         return cursor.fetchone() is not None
 
+    def get_all_ocr_results_for_image(self, image_id: int) -> List[Dict]:
+        """
+        Get all OCR results for a specific image from all providers.
+
+        Args:
+            image_id: Image ID
+
+        Returns:
+            List of OCR result records, one per provider
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT * FROM ocr_results
+            WHERE image_id = ?
+            ORDER BY provider
+        """, (image_id,))
+        return [dict(row) for row in cursor.fetchall()]
+
     def get_all_images(self, folder_filter: str = None) -> List[Dict]:
         """
         Get all images, optionally filtered by folder.
