@@ -66,8 +66,13 @@ class GoogleVisionOCR:
         self.use_api_key = False
         self.initialized = False
 
-        # If API key is provided, use REST API mode
-        if api_key:
+        # If no API key provided, try to get from keyring or environment
+        if not api_key:
+            api_key = self._get_api_key_from_keyring_or_env()
+            self.api_key = api_key
+
+        # If API key is available, use REST API mode (simpler, no SDK needed)
+        if self.api_key:
             self.use_api_key = True
             self.initialized = True
             logging.info("Google Vision OCR initialized with API key (REST mode)")
@@ -128,6 +133,49 @@ class GoogleVisionOCR:
                 return credentials
         except Exception as e:
             logging.debug(f"Could not load credentials from environment: {e}")
+        return None
+
+    def _get_api_key_from_keyring_or_env(self) -> Optional[str]:
+        """
+        Try to get Google API key from keyring or environment.
+
+        Checks in order:
+        1. Keyring: gemini/api_key (shared with Gemini/TTS)
+        2. Keyring: google/api_key
+        3. Environment: GEMINI_API_KEY
+        4. Environment: GOOGLE_API_KEY
+
+        Returns:
+            API key string or None
+        """
+        # Try keyring first
+        if KEYRING_AVAILABLE:
+            try:
+                # Check gemini keyring (shared API key)
+                api_key = keyring.get_password("gemini", "api_key")
+                if api_key:
+                    logging.info("Found API key in keyring (gemini/api_key)")
+                    return api_key
+
+                # Check google keyring
+                api_key = keyring.get_password("google", "api_key")
+                if api_key:
+                    logging.info("Found API key in keyring (google/api_key)")
+                    return api_key
+            except Exception as e:
+                logging.debug(f"Could not get API key from keyring: {e}")
+
+        # Try environment variables
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if api_key:
+            logging.info("Found API key in GEMINI_API_KEY environment variable")
+            return api_key
+
+        api_key = os.environ.get("GOOGLE_API_KEY")
+        if api_key:
+            logging.info("Found API key in GOOGLE_API_KEY environment variable")
+            return api_key
+
         return None
 
     def is_available(self) -> bool:
