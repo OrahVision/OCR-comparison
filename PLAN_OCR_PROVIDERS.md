@@ -2,358 +2,451 @@
 
 ## Overview
 
-This document outlines the plan for researching, implementing, and comparing OCR providers for the OCR-comparison tool. The goal is to evaluate multiple OCR solutions across accuracy, speed, cost, and language support to determine optimal providers for different use cases.
+This document outlines the comprehensive research, licensing analysis, and implementation plan for OCR providers. The goal is to evaluate multiple OCR solutions across accuracy, speed, cost, and language support while ensuring all providers allow commercial use.
 
 ---
 
-## Phase 1: Research and Discovery
+## Phase 1: Provider Research and Analysis
 
 ### 1.1 Local/Offline OCR Providers
 
-| Provider | Type | Languages | License | Notes |
-|----------|------|-----------|---------|-------|
-| **Tesseract OCR** | Open source | 100+ | Apache 2.0 | Industry standard, maintained by Google |
-| **EasyOCR** | Python library | 80+ | Apache 2.0 | PyTorch-based, good accuracy |
-| **PaddleOCR** | Python library | 80+ | Apache 2.0 | From Baidu, excellent for CJK |
-| **Windows OCR** | System API | 25+ | Proprietary | Built into Windows 10/11 |
-| **Doctr** | Python library | Latin scripts | Apache 2.0 | Document-focused, TensorFlow/PyTorch |
-| **Surya** | Python library | 90+ | GPL 3.0 | New, high accuracy claims |
-| **TrOCR** | ML Model | Multi | MIT | Microsoft transformer-based |
-| **Kraken** | Python library | Multi | Apache 2.0 | Historical documents focus |
+| Provider | License | Commercial Use | Languages | Est. Latency | Notes |
+|----------|---------|----------------|-----------|--------------|-------|
+| **Tesseract OCR** | Apache 2.0 | YES | 100+ | 1-5s/page | Industry standard, maintained by Google. Must include Apache license with product. [Source](https://github.com/tesseract-ocr/tesseract/blob/main/LICENSE) |
+| **EasyOCR** | Apache 2.0 | YES | 80+ | 2-8s/page | PyTorch-based. Good accuracy. [Source](https://github.com/JaidedAI/EasyOCR/blob/master/LICENSE) |
+| **PaddleOCR** | Apache 2.0 | YES* | 80+ | 1-3s/page | Excellent for CJK. *Watch PyMuPDF dependency (AGPL). [Source](https://github.com/PaddlePaddle/PaddleOCR/blob/main/LICENSE) |
+| **docTR** | Apache 2.0 | YES | Latin | 1-4s/page | By Mindee, PyTorch ecosystem. [Source](https://github.com/mindee/doctr) |
+| **TrOCR** | MIT | YES | Multi | 2-5s/page | Microsoft transformer-based. [Source](https://github.com/microsoft/unilm/blob/master/LICENSE) |
+| **Florence-2** | MIT | YES | Multi | ~1s/page | Microsoft VLM, lightweight (0.23B-0.77B params). [Source](https://huggingface.co/microsoft/Florence-2-large) |
+| **Qwen2-VL** | Apache 2.0 | YES (2B/7B) | Multi | 2-6s/page | Alibaba. 72B uses Qwen license. [Source](https://huggingface.co/Qwen/Qwen2-VL-7B-Instruct) |
+| **Windows OCR** | Proprietary | YES | 25+ | <1s/page | Built into Windows 10/11, free to use |
+| **Surya OCR** | GPL-3.0 + Custom | LIMITED | 90+ | 2-5s/page | Free for <$2M revenue. Commercial license required above. [Source](https://github.com/VikParuchuri/surya/blob/master/LICENSE) |
+| **GOT-OCR 2.0** | Research Only | NO | Multi | 1-3s/page | NOT for commercial use. [Source](https://github.com/Ucas-HaoranWei/GOT-OCR2.0) |
+| **DeepSeek-OCR** | TBD | TBD | Multi | TBD | Released Oct 2025, 97% accuracy at 10x compression. [Source](https://github.com/deepseek-ai/DeepSeek-OCR) |
 
 ### 1.2 Cloud/API OCR Providers
 
-| Provider | Pricing Model | Languages | Strengths |
-|----------|---------------|-----------|-----------|
-| **Google Cloud Vision** | Per image | 100+ | High accuracy, document detection |
-| **Azure AI Vision** | Per transaction | 100+ | Good handwriting, forms |
-| **Azure Document Intelligence** | Per page | 100+ | Structured document extraction |
-| **AWS Textract** | Per page | 6 | Tables, forms, queries |
-| **OpenAI GPT-4 Vision** | Per token | Multi | Context understanding |
-| **Google Gemini Vision** | Per token | Multi | Multimodal reasoning |
-| **Anthropic Claude Vision** | Per token | Multi | Reasoning, context |
-| **ABBYY Cloud** | Per page | 200+ | Enterprise-grade accuracy |
-| **OCR.space** | Per call/free tier | 25+ | Simple API, free tier |
-| **Mathpix** | Per request | Math focus | LaTeX output, equations |
+| Provider | License/Terms | Commercial Use | Pricing | Est. Latency | Languages |
+|----------|---------------|----------------|---------|--------------|-----------|
+| **Google Cloud Vision** | Commercial API | YES | $1.50/1K images | 1-3s | 100+ |
+| **Azure AI Document Intelligence** | Commercial API | YES | ~$1.50/1K pages (Read), $30/1K pages (Custom) | 2-5s | 100+ |
+| **AWS Textract** | Commercial API | YES | $1.50/1K pages (Detect), $15/1K (Forms) | 2-4s | 6 |
+| **OpenAI GPT-4o Vision** | Commercial API | YES | $2.50/1M input + ~$0.008/image | 2-5s | Multi |
+| **OpenAI GPT-4o-mini** | Commercial API | YES | $0.15/1M input + ~$0.008/image | 1-3s | Multi |
+| **Google Gemini 2.0 Flash** | Commercial API | YES | $0.10/1M tokens (~$0.001/image) | 1-3s | Multi |
+| **Anthropic Claude 3.5 Sonnet** | Commercial API | YES | $3/1M input (~$0.005/image) | 2-4s | Multi |
+| **Anthropic Claude 3 Haiku** | Commercial API | YES | $0.25/1M input (~$0.0004/image) | 1-2s | Multi |
+| **OCR.space** | Freemium | YES (with limits) | Free: 500/day, PRO: Contact | 1-3s | 25+ |
+| **ABBYY Cloud** | Commercial API | YES | Custom pricing | 2-5s | 200+ |
+| **Mindee** | Freemium | YES | Free: 25/month, $0.10/page after | 1-3s | Multi |
 
-### 1.3 Research Tasks
+### 1.3 Pricing Comparison (Estimated per 1,000 pages)
 
-- [ ] **Tesseract**: Test v4 vs v5, LSTM vs legacy modes, custom training
-- [ ] **EasyOCR**: Benchmark GPU vs CPU, test Hebrew support
-- [ ] **PaddleOCR**: Test PP-OCRv4, multilingual performance
-- [ ] **Windows OCR**: Test via Python winrt bindings
-- [ ] **Cloud Vision APIs**: Compare structured output formats
-- [ ] **LLM Vision**: Test GPT-4V, Gemini, Claude for OCR tasks
-- [ ] **Specialized**: Research Hebrew-specific OCR options
+| Provider | Basic OCR | With Structure/Tables | Notes |
+|----------|-----------|----------------------|-------|
+| **Local (Tesseract, etc.)** | $0 | $0 | Compute costs only |
+| **Google Cloud Vision** | $1.50 | $1.50 | Document text detection |
+| **Azure Document Intelligence** | ~$1.50 | $30-65 | Read vs Custom models |
+| **AWS Textract** | $1.50 | $15-65 | DetectText vs AnalyzeDocument |
+| **Gemini 2.0 Flash** | ~$1.00 | ~$1.00 | Best price/performance for LLM |
+| **Claude 3 Haiku** | ~$0.40 | ~$0.40 | Cheapest LLM option |
+| **GPT-4o-mini** | ~$8.00 | ~$8.00 | Higher token costs |
+| **OCR.space** | Free-$$ | Contact | 500 free/day |
 
 ---
 
-## Phase 2: Provider Interface Design
+## Phase 2: Commercial License Summary
 
-### 2.1 Base Provider Interface
+### APPROVED FOR COMMERCIAL USE
 
-All providers must implement this common interface:
+| Provider | License | Requirements |
+|----------|---------|--------------|
+| Tesseract | Apache 2.0 | Include license copy |
+| EasyOCR | Apache 2.0 | Include license copy |
+| PaddleOCR | Apache 2.0 | Include license, check dependencies |
+| docTR | Apache 2.0 | Include license copy |
+| TrOCR | MIT | Include copyright notice |
+| Florence-2 | MIT | Include copyright notice |
+| Qwen2-VL (2B/7B) | Apache 2.0 | Include license copy |
+| Windows OCR | Proprietary | Windows license covers use |
+| All Cloud APIs | Commercial | Follow API terms of service |
 
-```python
-class OCRProvider:
-    """Base interface for all OCR providers."""
+### RESTRICTED / NOT FOR COMMERCIAL USE
 
-    PROVIDER_NAME: str  # Unique identifier
-    PROVIDER_TYPE: str  # "local" or "cloud"
+| Provider | Restriction | Alternative |
+|----------|-------------|-------------|
+| **GOT-OCR 2.0** | Research only | Use Qwen2-VL or Florence-2 |
+| **Surya OCR** | <$2M revenue or need license | Contact Datalab for commercial license |
+| **Qwen2-VL-72B** | Qwen license (review terms) | Use 2B or 7B versions |
+| **DeepSeek-OCR** | License TBD (new release) | Wait for clarification |
 
-    def __init__(self, **config):
-        """Initialize with provider-specific configuration."""
-        pass
+### DEPENDENCY WARNINGS
 
-    def is_available(self) -> bool:
-        """Check if provider is configured and ready."""
-        pass
+| Provider | Dependency | Issue | Solution |
+|----------|------------|-------|----------|
+| PaddleOCR | PyMuPDF | AGPL-3.0 may require open-sourcing | Use pdf2image instead, or avoid PDF features |
 
-    async def process_image(self, image_path: str) -> OCRResult:
-        """Process image and return OCR result."""
-        pass
+---
 
-    def process_image_sync(self, image_path: str) -> OCRResult:
-        """Synchronous wrapper for process_image."""
-        pass
+## Phase 3: Provider Interface Design
 
-    def get_supported_languages(self) -> List[str]:
-        """Return list of supported language codes."""
-        pass
-
-    def estimate_cost(self, image_path: str) -> Optional[float]:
-        """Estimate cost for processing (cloud providers)."""
-        pass
-```
-
-### 2.2 OCR Result Structure
+### 3.1 Base Provider Interface
 
 ```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Any
+from enum import Enum
+
+class ProviderType(Enum):
+    LOCAL = "local"
+    CLOUD = "cloud"
+    LLM = "llm"
+
+@dataclass
+class BoundingBox:
+    x: int
+    y: int
+    width: int
+    height: int
+    text: str
+    confidence: float
+
 @dataclass
 class OCRResult:
     success: bool
     provider: str
+    provider_type: ProviderType
     text: str
     word_count: int
-    confidence: float  # 0.0 to 1.0
+    confidence: float
     processing_time_ms: float
 
     # Optional detailed data
-    pages: Optional[List[PageData]] = None
     bounding_boxes: Optional[List[BoundingBox]] = None
     language_detected: Optional[str] = None
+    pages: Optional[List[Dict]] = None
 
     # Error info
     error: Optional[str] = None
 
     # Cost tracking (cloud providers)
-    estimated_cost: Optional[float] = None
+    estimated_cost_usd: Optional[float] = None
+    tokens_used: Optional[int] = None
+
+class OCRProvider(ABC):
+    """Base interface for all OCR providers."""
+
+    PROVIDER_NAME: str
+    PROVIDER_TYPE: ProviderType
+    COMMERCIAL_USE: bool
+    LICENSE: str
+
+    @abstractmethod
+    def __init__(self, **config):
+        """Initialize with provider-specific configuration."""
+        pass
+
+    @abstractmethod
+    def is_available(self) -> bool:
+        """Check if provider is configured and ready."""
+        pass
+
+    @abstractmethod
+    async def process_image(self, image_path: str, **options) -> OCRResult:
+        """Process image and return OCR result."""
+        pass
+
+    def process_image_sync(self, image_path: str, **options) -> OCRResult:
+        """Synchronous wrapper."""
+        import asyncio
+        return asyncio.run(self.process_image(image_path, **options))
+
+    @abstractmethod
+    def get_supported_languages(self) -> List[str]:
+        """Return list of supported language codes."""
+        pass
+
+    def estimate_cost(self, num_pages: int = 1) -> Optional[float]:
+        """Estimate cost for processing (USD). None for local providers."""
+        return None
 ```
 
-### 2.3 Provider Registry
+### 3.2 Provider Registry
 
 ```python
 class ProviderRegistry:
     """Registry for managing OCR providers."""
 
-    def register(self, provider_class: Type[OCRProvider]) -> None:
-        """Register a provider class."""
-        pass
+    _providers: Dict[str, type] = {}
+    _instances: Dict[str, OCRProvider] = {}
 
-    def get_provider(self, name: str, **config) -> OCRProvider:
-        """Get initialized provider by name."""
-        pass
+    @classmethod
+    def register(cls, provider_class: type) -> None:
+        cls._providers[provider_class.PROVIDER_NAME] = provider_class
 
-    def list_available(self) -> List[str]:
-        """List all available (configured) providers."""
-        pass
+    @classmethod
+    def get(cls, name: str, **config) -> OCRProvider:
+        if name not in cls._instances:
+            cls._instances[name] = cls._providers[name](**config)
+        return cls._instances[name]
 
-    def list_local(self) -> List[str]:
-        """List local providers only."""
-        pass
+    @classmethod
+    def list_all(cls) -> List[str]:
+        return list(cls._providers.keys())
 
-    def list_cloud(self) -> List[str]:
-        """List cloud providers only."""
-        pass
+    @classmethod
+    def list_available(cls) -> List[str]:
+        return [n for n, p in cls._providers.items()
+                if cls.get(n).is_available()]
+
+    @classmethod
+    def list_commercial(cls) -> List[str]:
+        return [n for n, p in cls._providers.items()
+                if p.COMMERCIAL_USE]
 ```
 
 ---
 
-## Phase 3: Implementation Order
+## Phase 4: Implementation Priority
 
-### Priority 1: Core Providers (Week 1)
+### Priority 1: Essential Providers (Implement First)
 
-These are the most commonly used and should be implemented first.
+| # | Provider | Type | Why Priority |
+|---|----------|------|--------------|
+| 1 | **Google Cloud Vision** | Cloud | DONE - Already implemented |
+| 2 | **Tesseract** | Local | Most widely used local OCR |
+| 3 | **Gemini 2.0 Flash** | LLM | Best price/performance, shares API key |
 
-#### 3.1 Tesseract OCR
-- **File**: `ocr/providers/tesseract.py`
-- **Dependencies**: `pytesseract`, Tesseract binary
-- **Tasks**:
-  - [ ] Basic implementation with pytesseract
-  - [ ] Language pack configuration
-  - [ ] Page segmentation modes (PSM)
-  - [ ] OEM engine modes (LSTM vs legacy)
-  - [ ] Confidence extraction
-  - [ ] Bounding box support
-  - [ ] Hebrew language testing
+### Priority 2: Key Alternatives
 
-#### 3.2 Google Cloud Vision (DONE)
-- **File**: `ocr/providers/google_vision.py`
-- **Status**: Implemented
-- **Tasks**:
-  - [x] SDK authentication
-  - [x] API key authentication (REST)
-  - [x] Keyring integration
-  - [x] Document text detection
-  - [ ] Add bounding box extraction
-  - [ ] Add language detection
+| # | Provider | Type | Why Include |
+|---|----------|------|-------------|
+| 4 | **Azure Document Intelligence** | Cloud | Enterprise standard, good forms |
+| 5 | **AWS Textract** | Cloud | AWS ecosystem, tables/queries |
+| 6 | **Claude 3 Haiku** | LLM | Cheapest LLM, good accuracy |
 
-### Priority 2: Alternative Cloud Providers (Week 2)
+### Priority 3: High-Accuracy Options
 
-#### 3.3 Azure Computer Vision
-- **File**: `ocr/providers/azure_vision.py`
-- **Dependencies**: `azure-cognitiveservices-vision-computervision`
-- **Tasks**:
-  - [ ] API key authentication
-  - [ ] Read API (async OCR)
-  - [ ] Handwriting support
-  - [ ] Language detection
-  - [ ] Cost tracking
+| # | Provider | Type | Why Include |
+|---|----------|------|-------------|
+| 7 | **EasyOCR** | Local | Good accuracy, multilingual |
+| 8 | **PaddleOCR** | Local | Excellent for CJK |
+| 9 | **GPT-4o** | LLM | Highest accuracy for complex |
 
-#### 3.4 AWS Textract
-- **File**: `ocr/providers/aws_textract.py`
-- **Dependencies**: `boto3`
-- **Tasks**:
-  - [ ] IAM/credential configuration
-  - [ ] DetectDocumentText API
-  - [ ] AnalyzeDocument API (tables, forms)
-  - [ ] Async operations for large docs
-  - [ ] Cost tracking
+### Priority 4: Specialized/Experimental
 
-### Priority 3: LLM Vision Providers (Week 3)
+| # | Provider | Type | Why Include |
+|---|----------|------|-------------|
+| 10 | **Florence-2** | Local | Lightweight VLM |
+| 11 | **Qwen2-VL** | Local | Open weights, strong OCR |
+| 12 | **docTR** | Local | Document-focused |
+| 13 | **Windows OCR** | Local | Zero-install on Windows |
+| 14 | **OCR.space** | Cloud | Free tier for testing |
 
-#### 3.5 OpenAI GPT-4 Vision
-- **File**: `ocr/providers/openai_vision.py`
-- **Dependencies**: `openai`
-- **Tasks**:
-  - [ ] API key from keyring/env
-  - [ ] Image encoding (base64)
-  - [ ] OCR-specific prompting
-  - [ ] Token/cost estimation
-  - [ ] Compare gpt-4o vs gpt-4o-mini
+### NOT Implementing (License Issues)
 
-#### 3.6 Google Gemini Vision
-- **File**: `ocr/providers/gemini_vision.py`
-- **Dependencies**: `google-generativeai`
-- **Tasks**:
-  - [ ] Share API key with existing setup
-  - [ ] Image processing
-  - [ ] OCR-optimized prompts
-  - [ ] Compare models (flash vs pro)
-
-#### 3.7 Anthropic Claude Vision
-- **File**: `ocr/providers/claude_vision.py`
-- **Dependencies**: `anthropic`
-- **Tasks**:
-  - [ ] API key configuration
-  - [ ] Image encoding
-  - [ ] OCR prompting strategy
-  - [ ] Cost tracking
-
-### Priority 4: Local Alternatives (Week 4)
-
-#### 3.8 EasyOCR
-- **File**: `ocr/providers/easyocr_provider.py`
-- **Dependencies**: `easyocr`, PyTorch
-- **Tasks**:
-  - [ ] Basic implementation
-  - [ ] GPU vs CPU configuration
-  - [ ] Language model downloads
-  - [ ] Hebrew support testing
-  - [ ] Batch processing
-
-#### 3.9 PaddleOCR
-- **File**: `ocr/providers/paddleocr_provider.py`
-- **Dependencies**: `paddleocr`, PaddlePaddle
-- **Tasks**:
-  - [ ] Installation (can be tricky)
-  - [ ] PP-OCRv4 configuration
-  - [ ] Multilingual support
-  - [ ] Direction detection
-
-#### 3.10 Windows OCR
-- **File**: `ocr/providers/windows_ocr.py`
-- **Dependencies**: `winrt` (Windows only)
-- **Tasks**:
-  - [ ] WinRT bindings
-  - [ ] Language pack detection
-  - [ ] Async processing
-  - [ ] Platform detection (skip on non-Windows)
-
-### Priority 5: Specialized Providers (Week 5)
-
-#### 3.11 Surya OCR
-- **File**: `ocr/providers/surya_provider.py`
-- **Dependencies**: `surya-ocr`
-- **Tasks**:
-  - [ ] Model download/caching
-  - [ ] Line detection
-  - [ ] Text recognition
-  - [ ] Layout analysis
-
-#### 3.12 OCR.space API
-- **File**: `ocr/providers/ocrspace.py`
-- **Dependencies**: `requests`
-- **Tasks**:
-  - [ ] Free tier implementation
-  - [ ] API key for premium
-  - [ ] Engine selection (1, 2, 3)
-  - [ ] Table detection
+| Provider | Reason |
+|----------|--------|
+| GOT-OCR 2.0 | Research only license |
+| Surya OCR | GPL + revenue limits |
+| DeepSeek-OCR | License unclear (new) |
 
 ---
 
-## Phase 4: Testing Infrastructure
+## Phase 5: Implementation Details
 
-### 4.1 Test Image Collection
+### 5.1 Tesseract Implementation
 
-Create a diverse test set in `samples/`:
+**File**: `ocr/providers/tesseract_ocr.py`
+
+```python
+class TesseractOCR(OCRProvider):
+    PROVIDER_NAME = "tesseract"
+    PROVIDER_TYPE = ProviderType.LOCAL
+    COMMERCIAL_USE = True
+    LICENSE = "Apache-2.0"
+
+    def __init__(self, lang: str = "eng", psm: int = 3, oem: int = 3):
+        self.lang = lang
+        self.psm = psm  # Page segmentation mode
+        self.oem = oem  # OCR Engine mode (3 = LSTM + legacy)
+```
+
+**Dependencies**: `pytesseract`, Tesseract binary installed
+
+**Tasks**:
+- [ ] Basic implementation
+- [ ] Multi-language support
+- [ ] PSM mode configuration
+- [ ] Confidence extraction
+- [ ] Bounding box extraction
+- [ ] Hebrew testing
+
+### 5.2 Gemini Vision Implementation
+
+**File**: `ocr/providers/gemini_vision.py`
+
+```python
+class GeminiVisionOCR(OCRProvider):
+    PROVIDER_NAME = "gemini_vision"
+    PROVIDER_TYPE = ProviderType.LLM
+    COMMERCIAL_USE = True
+    LICENSE = "Commercial API"
+
+    # Shares API key with existing gemini/api_key in keyring
+```
+
+**Dependencies**: `google-generativeai`
+
+**Pricing**: ~$0.10/1M tokens, ~$0.001/image
+
+**Tasks**:
+- [ ] Share API key from keyring (gemini/api_key)
+- [ ] Image encoding
+- [ ] OCR-optimized prompting
+- [ ] Markdown output parsing
+- [ ] Cost tracking
+
+### 5.3 Azure Document Intelligence
+
+**File**: `ocr/providers/azure_doc_intel.py`
+
+**Dependencies**: `azure-ai-documentintelligence`
+
+**Pricing**: ~$1.50/1K pages (Read API)
+
+**Tasks**:
+- [ ] API key configuration
+- [ ] Read API (general OCR)
+- [ ] Layout API (tables, structure)
+- [ ] Async processing
+- [ ] Cost tracking
+
+### 5.4 AWS Textract
+
+**File**: `ocr/providers/aws_textract.py`
+
+**Dependencies**: `boto3`
+
+**Pricing**: $1.50/1K pages (DetectDocumentText)
+
+**Tasks**:
+- [ ] AWS credentials setup
+- [ ] DetectDocumentText API
+- [ ] AnalyzeDocument for tables
+- [ ] Async operations
+- [ ] Cost tracking
+
+### 5.5 Claude Vision
+
+**File**: `ocr/providers/claude_vision.py`
+
+**Dependencies**: `anthropic`
+
+**Pricing**: $0.25/1M tokens (Haiku), $3/1M (Sonnet)
+
+**Tasks**:
+- [ ] API key configuration
+- [ ] Model selection (Haiku vs Sonnet)
+- [ ] Image encoding
+- [ ] OCR prompting
+- [ ] Cost tracking
+
+### 5.6 EasyOCR
+
+**File**: `ocr/providers/easyocr_provider.py`
+
+**Dependencies**: `easyocr`, PyTorch
+
+**Tasks**:
+- [ ] Basic implementation
+- [ ] GPU/CPU configuration
+- [ ] Language model management
+- [ ] Hebrew support
+- [ ] Batch processing
+
+### 5.7 PaddleOCR
+
+**File**: `ocr/providers/paddleocr_provider.py`
+
+**Dependencies**: `paddleocr`, PaddlePaddle
+
+**Notes**: Avoid PyMuPDF dependency for commercial use
+
+**Tasks**:
+- [ ] Installation handling
+- [ ] PP-OCRv4 configuration
+- [ ] Multilingual support
+- [ ] Angle detection
+
+---
+
+## Phase 6: Testing Infrastructure
+
+### 6.1 Test Image Categories
 
 ```
 samples/
 |-- english/
-|   |-- printed_clean.jpg      # Clean printed text
-|   |-- printed_noisy.jpg      # Noisy/low quality
-|   |-- handwritten.jpg        # Handwritten text
-|   |-- mixed_fonts.jpg        # Multiple fonts
+|   |-- printed_clean.jpg       # Clean printed text
+|   |-- printed_noisy.jpg       # Low quality scan
+|   |-- handwritten.jpg         # Handwritten text
+|   |-- mixed_fonts.jpg         # Multiple fonts/sizes
 |
 |-- hebrew/
-|   |-- printed_modern.jpg     # Modern Hebrew print
-|   |-- printed_classic.jpg    # Classic Hebrew text
-|   |-- mixed_heb_eng.jpg      # Hebrew + English
-|   |-- nikud.jpg              # With vowel points
+|   |-- printed_modern.jpg      # Modern Hebrew print
+|   |-- with_nikud.jpg          # With vowel points
+|   |-- mixed_heb_eng.jpg       # Bilingual document
 |
 |-- documents/
-|   |-- invoice.jpg            # Invoice/receipt
-|   |-- form.jpg               # Form with fields
-|   |-- table.jpg              # Table data
-|   |-- multi_column.jpg       # Multi-column layout
+|   |-- invoice.jpg             # Invoice/receipt
+|   |-- form_filled.jpg         # Filled form
+|   |-- table_data.jpg          # Table with data
+|   |-- multi_column.jpg        # Multi-column layout
 |
 |-- challenging/
-|   |-- rotated.jpg            # Rotated text
-|   |-- curved.jpg             # Curved/warped
-|   |-- low_contrast.jpg       # Low contrast
-|   |-- partial.jpg            # Partially visible
+|   |-- rotated_15deg.jpg       # Slightly rotated
+|   |-- low_contrast.jpg        # Low contrast
+|   |-- curved_page.jpg         # Book spine curve
+|   |-- partial_occlusion.jpg   # Partially hidden
 ```
 
-### 4.2 Ground Truth Files
+### 6.2 Metrics
 
-For each test image, create a `.txt` file with the expected text:
+| Metric | Description | Formula |
+|--------|-------------|---------|
+| **CER** | Character Error Rate | Levenshtein(pred, truth) / len(truth) |
+| **WER** | Word Error Rate | Word edits / total words |
+| **Latency** | Processing time | End-to-end milliseconds |
+| **Cost** | USD per page | API pricing calculation |
+| **Throughput** | Pages per minute | For batch processing |
 
+### 6.3 Comparison Script
+
+**File**: `compare_providers.py`
+
+```bash
+# Single image, all providers
+python compare_providers.py image.jpg
+
+# Specific providers
+python compare_providers.py image.jpg --providers tesseract,google_vision,gemini
+
+# Full test suite
+python compare_providers.py samples/ --output results/report.json
+
+# With TTS playback
+python compare_providers.py image.jpg --with-tts
 ```
-samples/english/printed_clean.txt
-samples/hebrew/printed_modern.txt
-...
-```
-
-### 4.3 Comparison Script
-
-Create `compare_providers.py`:
-
-```python
-# Usage:
-# python compare_providers.py samples/english/printed_clean.jpg
-# python compare_providers.py samples/ --all-providers --output results/
-
-Features:
-- Run single image through all providers
-- Run test suite through selected providers
-- Generate comparison report (accuracy, speed, cost)
-- Export results to JSON/CSV
-- Side-by-side text comparison
-- Character Error Rate (CER) calculation
-- Word Error Rate (WER) calculation
-```
-
-### 4.4 Metrics to Track
-
-| Metric | Description | Calculation |
-|--------|-------------|-------------|
-| **CER** | Character Error Rate | Levenshtein distance / total chars |
-| **WER** | Word Error Rate | Word-level edit distance / total words |
-| **Processing Time** | End-to-end latency | Milliseconds |
-| **Confidence** | Provider's confidence score | 0.0 - 1.0 |
-| **Cost** | API cost per image | USD |
-| **Language Accuracy** | Correct language detection | Boolean |
 
 ---
 
-## Phase 5: Integration with TTS
+## Phase 7: Integration with TTS
 
-### 5.1 OCR-to-TTS Pipeline
+### 7.1 OCR-to-TTS Pipeline
 
 ```python
-# Full pipeline: Image -> OCR -> Cleanup -> TTS -> Audio
-
 async def ocr_to_speech(
     image_path: str,
     ocr_provider: str = "google_vision",
@@ -363,51 +456,48 @@ async def ocr_to_speech(
     """
     Complete OCR to speech pipeline.
 
-    Returns:
-        {
-            "ocr_result": OCRResult,
-            "cleaned_text": str,
-            "tts_success": bool,
-            "total_time_ms": float
-        }
+    1. Run OCR on image
+    2. Apply text cleanup (configurable)
+    3. Send to TTS
+    4. Stream audio playback
     """
 ```
 
-### 5.2 Provider Comparison with TTS
+### 7.2 Quality Comparison
 
-Compare how OCR quality affects TTS output:
-- Same image through different OCR providers
-- Same cleanup config
-- Listen to TTS output for each
-- Rate intelligibility
+Compare TTS output quality based on OCR source:
+- Same image through multiple OCR providers
+- Same cleanup settings
+- Rate intelligibility of spoken output
 
 ---
 
-## Phase 6: Documentation and Reporting
+## Research Sources
 
-### 6.1 Provider Documentation
+### Local Providers
+- [Tesseract License](https://github.com/tesseract-ocr/tesseract/blob/main/LICENSE)
+- [EasyOCR License](https://github.com/JaidedAI/EasyOCR/blob/master/LICENSE)
+- [PaddleOCR License](https://github.com/PaddlePaddle/PaddleOCR/blob/main/LICENSE)
+- [docTR GitHub](https://github.com/mindee/doctr)
+- [Florence-2 on HuggingFace](https://huggingface.co/microsoft/Florence-2-large)
+- [Qwen2-VL on HuggingFace](https://huggingface.co/Qwen/Qwen2-VL-7B-Instruct)
+- [Surya OCR License](https://github.com/VikParuchuri/surya/blob/master/LICENSE)
+- [GOT-OCR 2.0 GitHub](https://github.com/Ucas-HaoranWei/GOT-OCR2.0)
+- [DeepSeek-OCR GitHub](https://github.com/deepseek-ai/DeepSeek-OCR)
 
-For each provider, document:
-- Installation instructions
-- Configuration options
-- Supported languages
-- Known limitations
-- Cost structure
-- Performance characteristics
+### Cloud Provider Pricing
+- [Google Cloud Vision Pricing](https://cloud.google.com/vision/pricing)
+- [Azure Document Intelligence Pricing](https://azure.microsoft.com/en-us/pricing/details/ai-document-intelligence/)
+- [AWS Textract Pricing](https://aws.amazon.com/textract/pricing/)
+- [OpenAI Pricing](https://openai.com/api/pricing/)
+- [Gemini Pricing](https://ai.google.dev/gemini-api/docs/pricing)
+- [Anthropic Pricing](https://www.anthropic.com/pricing)
+- [OCR.space](https://ocr.space/)
 
-### 6.2 Comparison Report
-
-Generate a final report with:
-- Accuracy rankings by document type
-- Speed benchmarks
-- Cost analysis
-- Recommendations by use case:
-  - Best for English printed text
-  - Best for Hebrew
-  - Best for handwriting
-  - Best for forms/tables
-  - Best offline option
-  - Best cost/accuracy ratio
+### Comparison Articles
+- [Best OCR APIs 2025 - Klippa](https://www.klippa.com/en/blog/information/best-ocr-api/)
+- [OCR API Guide - Docsumo](https://www.docsumo.com/blogs/ocr/api)
+- [OCR Benchmarks - Nanonets](https://nanonets.com/blog/identifying-the-best-ocr-api/)
 
 ---
 
@@ -422,78 +512,45 @@ Generate a final report with:
 - [ ] Build comparison script
 
 ### Providers - Local
-- [x] Google Cloud Vision (implemented)
+- [x] Google Cloud Vision (implemented as cloud)
 - [ ] Tesseract OCR
 - [ ] EasyOCR
 - [ ] PaddleOCR
+- [ ] docTR
+- [ ] Florence-2
+- [ ] Qwen2-VL
 - [ ] Windows OCR
-- [ ] Surya OCR
 
 ### Providers - Cloud
 - [x] Google Cloud Vision
-- [ ] Azure Computer Vision
+- [ ] Azure Document Intelligence
 - [ ] AWS Textract
-- [ ] OpenAI GPT-4 Vision
-- [ ] Google Gemini Vision
-- [ ] Anthropic Claude Vision
 - [ ] OCR.space
 
-### Testing
-- [ ] Collect test images (10+ per category)
+### Providers - LLM Vision
+- [ ] Google Gemini 2.0 Flash
+- [ ] OpenAI GPT-4o / GPT-4o-mini
+- [ ] Anthropic Claude (Haiku / Sonnet)
+
+### Testing & Comparison
+- [ ] Collect test images (5+ per category)
 - [ ] Create ground truth transcriptions
-- [ ] Run initial benchmarks
+- [ ] Implement CER/WER metrics
+- [ ] Run benchmarks
 - [ ] Generate comparison report
 
 ### Integration
 - [ ] OCR-to-TTS pipeline
-- [ ] Provider selection logic
-- [ ] Fallback chain implementation
-
----
-
-## Notes
-
-### Hebrew OCR Considerations
-- Tesseract Hebrew (heb) language pack quality varies
-- Google Cloud Vision has good Hebrew support
-- Right-to-left text handling
-- Nikud (vowel points) recognition
-- Mixed Hebrew/English documents
-
-### Cost Optimization
-- Use local providers for bulk processing
-- Cache OCR results
-- Batch requests where possible
-- Monitor API usage
-
-### Performance Tips
-- Pre-warm ML models (EasyOCR, PaddleOCR)
-- Use GPU acceleration where available
-- Async processing for cloud providers
-- Image preprocessing can improve accuracy
-
----
-
-## Timeline Estimate
-
-| Phase | Duration | Deliverable |
-|-------|----------|-------------|
-| Research | 2-3 days | Provider comparison matrix |
-| Interface Design | 1 day | Base classes, registry |
-| Priority 1 Providers | 3-4 days | Tesseract + Google Vision |
-| Priority 2 Providers | 3-4 days | Azure + AWS |
-| Priority 3 Providers | 3-4 days | LLM Vision providers |
-| Priority 4 Providers | 3-4 days | EasyOCR, PaddleOCR, Windows |
-| Testing Infrastructure | 2-3 days | Test suite, metrics |
-| Comparison Report | 1-2 days | Final analysis |
-
-**Total: ~3-4 weeks for comprehensive implementation**
+- [ ] Provider fallback chain
+- [ ] Cost optimization logic
 
 ---
 
 ## Next Steps
 
-1. **Immediate**: Implement Tesseract provider (most common local option)
-2. **Then**: Build comparison infrastructure
-3. **Then**: Add providers one by one, testing as we go
-4. **Finally**: Generate comprehensive comparison report
+1. **Implement base classes** (OCRProvider, OCRResult, Registry)
+2. **Implement Tesseract** (most common local)
+3. **Implement Gemini Vision** (shares API key, cheap)
+4. **Build comparison infrastructure**
+5. **Add providers incrementally, testing as we go**
+6. **Generate final comparison report**
