@@ -22,7 +22,7 @@ This document outlines the comprehensive research, licensing analysis, and imple
 | **Windows OCR** | Proprietary | YES | 25+ | <1s/page | Built into Windows 10/11, free to use |
 | **Surya OCR** | GPL-3.0 + Custom | LIMITED | 90+ | 2-5s/page | Free for <$2M revenue. Commercial license required above. [Source](https://github.com/VikParuchuri/surya/blob/master/LICENSE) |
 | **GOT-OCR 2.0** | Research Only | NO | Multi | 1-3s/page | NOT for commercial use. [Source](https://github.com/Ucas-HaoranWei/GOT-OCR2.0) |
-| **DeepSeek-OCR** | TBD | TBD | Multi | TBD | Released Oct 2025, 97% accuracy at 10x compression. [Source](https://github.com/deepseek-ai/DeepSeek-OCR) |
+| **DeepSeek-OCR** | MIT | YES | ~100 | 1-3s/page | Released Oct 2025, 3B params, 97% OCR at 10x compression, 16GB VRAM. [Source](https://github.com/deepseek-ai/DeepSeek-OCR) |
 
 ### 1.2 Cloud/API OCR Providers
 
@@ -69,6 +69,7 @@ This document outlines the comprehensive research, licensing analysis, and imple
 | Florence-2 | MIT | Include copyright notice |
 | Qwen2-VL (2B/7B) | Apache 2.0 | Include license copy |
 | Windows OCR | Proprietary | Windows license covers use |
+| DeepSeek-OCR | MIT | Include copyright notice |
 | All Cloud APIs | Commercial | Follow API terms of service |
 
 ### RESTRICTED / NOT FOR COMMERCIAL USE
@@ -78,7 +79,6 @@ This document outlines the comprehensive research, licensing analysis, and imple
 | **GOT-OCR 2.0** | Research only | Use Qwen2-VL or Florence-2 |
 | **Surya OCR** | <$2M revenue or need license | Contact Datalab for commercial license |
 | **Qwen2-VL-72B** | Qwen license (review terms) | Use 2B or 7B versions |
-| **DeepSeek-OCR** | License TBD (new release) | Wait for clarification |
 
 ### DEPENDENCY WARNINGS
 
@@ -210,39 +210,37 @@ class ProviderRegistry:
 
 ## Phase 4: Implementation Priority
 
-### Priority 1: Essential Providers (Implement First)
+### Phase A: Local Providers (Implement First)
 
-| # | Provider | Type | Why Priority |
-|---|----------|------|--------------|
-| 1 | **Google Cloud Vision** | Cloud | DONE - Already implemented |
-| 2 | **Tesseract** | Local | Most widely used local OCR |
-| 3 | **Gemini 2.0 Flash** | LLM | Best price/performance, shares API key |
+| # | Provider | Type | Status | Notes |
+|---|----------|------|--------|-------|
+| 1 | **Tesseract** | Local | DONE | Most widely used local OCR |
+| 2 | **EasyOCR** | Local | DONE | Good accuracy, multilingual, PyTorch-based |
+| 3 | **PaddleOCR** | Local | DONE | Excellent for CJK, fast |
+| 4 | **docTR** | Local | DONE | Document-focused, by Mindee |
+| 5 | **Windows OCR** | Local | DONE | Zero-install on Windows, very fast |
+| 6 | **DeepSeek-OCR** | Local | DONE | 97% accuracy, needs GPU (16GB VRAM) |
+| 7 | **Florence-2** | Local | DONE | Lightweight VLM (0.23B-0.77B params) |
+| 8 | **Qwen2-VL** | Local | DONE | Open weights, strong OCR |
 
-### Priority 2: Key Alternatives
+### Phase B: Cloud/API Providers (Implement After Local)
 
-| # | Provider | Type | Why Include |
-|---|----------|------|-------------|
-| 4 | **Azure Document Intelligence** | Cloud | Enterprise standard, good forms |
-| 5 | **AWS Textract** | Cloud | AWS ecosystem, tables/queries |
-| 6 | **Claude 3 Haiku** | LLM | Cheapest LLM, good accuracy |
+| # | Provider | Type | Status | Notes |
+|---|----------|------|--------|-------|
+| 9 | **Google Cloud Vision** | Cloud | DONE | Already implemented |
+| 10 | **Azure Document Intelligence** | Cloud | Pending | Enterprise standard, good forms |
+| 11 | **AWS Textract** | Cloud | Pending | AWS ecosystem, tables/queries |
+| 12 | **OCR.space** | Cloud | Pending | Free tier for testing |
 
-### Priority 3: High-Accuracy Options
+### Phase C: LLM Vision Providers (Implement Last)
 
-| # | Provider | Type | Why Include |
-|---|----------|------|-------------|
-| 7 | **EasyOCR** | Local | Good accuracy, multilingual |
-| 8 | **PaddleOCR** | Local | Excellent for CJK |
-| 9 | **GPT-4o** | LLM | Highest accuracy for complex |
-
-### Priority 4: Specialized/Experimental
-
-| # | Provider | Type | Why Include |
-|---|----------|------|-------------|
-| 10 | **Florence-2** | Local | Lightweight VLM |
-| 11 | **Qwen2-VL** | Local | Open weights, strong OCR |
-| 12 | **docTR** | Local | Document-focused |
-| 13 | **Windows OCR** | Local | Zero-install on Windows |
-| 14 | **OCR.space** | Cloud | Free tier for testing |
+| # | Provider | Type | Status | Notes |
+|---|----------|------|--------|-------|
+| 13 | **Gemini 2.0 Flash** | LLM | Pending | Best price/performance, shares API key |
+| 14 | **Claude 3 Haiku** | LLM | Pending | Cheapest LLM option |
+| 15 | **Claude 3.5 Sonnet** | LLM | Pending | Higher accuracy |
+| 16 | **GPT-4o-mini** | LLM | Pending | Good balance |
+| 17 | **GPT-4o** | LLM | Pending | Highest accuracy for complex |
 
 ### NOT Implementing (License Issues)
 
@@ -250,7 +248,6 @@ class ProviderRegistry:
 |----------|--------|
 | GOT-OCR 2.0 | Research only license |
 | Surya OCR | GPL + revenue limits |
-| DeepSeek-OCR | License unclear (new) |
 
 ---
 
@@ -380,6 +377,50 @@ class GeminiVisionOCR(OCRProvider):
 - [ ] Multilingual support
 - [ ] Angle detection
 
+### 5.8 DeepSeek-OCR Implementation
+
+**File**: `ocr/providers/deepseek_ocr.py`
+
+```python
+class DeepSeekOCR(OCRProvider):
+    PROVIDER_NAME = "deepseek_ocr"
+    PROVIDER_TYPE = ProviderType.LOCAL
+    COMMERCIAL_USE = True
+    LICENSE = "MIT"
+
+    # 3B parameters, requires ~16GB VRAM (or 4-bit on T4)
+    # Supports ~100 languages, 97% accuracy at 10x compression
+```
+
+**Dependencies**: `torch 2.6.0`, `transformers 4.46+`, `flash-attn 2.7.3`, `vllm 0.8.5` (optional)
+
+**Hardware Requirements**:
+- Full precision (BF16): A100/L4 GPU with 16GB+ VRAM
+- 4-bit quantized: T4 GPU (16GB) compatible
+- Performance: ~2500 tokens/s on A100 with vLLM
+
+**Model Variants** (native resolution):
+- Tiny: 512x512 (64 vision tokens)
+- Small: 640x640 (100 vision tokens)
+- Base: 1024x1024 (256 vision tokens)
+- Large: 1280x1280 (400 vision tokens)
+
+**Key Features**:
+- Optical compression: 97% OCR precision at 10x compression
+- ~100 language support (25M Chinese/English, 5M other languages in training)
+- Outputs clean, structured Markdown
+- Handles PDFs, screenshots, tables, handwritten text
+- Built on DeepSeek-VL2 vision-language model
+
+**Tasks**:
+- [ ] Basic implementation with transformers
+- [ ] vLLM batch inference support
+- [ ] 4-bit quantization for lower VRAM
+- [ ] Resolution configuration
+- [ ] PDF processing
+- [ ] Markdown output parsing
+- [ ] Hebrew/multilingual testing
+
 ---
 
 ## Phase 6: Testing Infrastructure
@@ -484,6 +525,8 @@ Compare TTS output quality based on OCR source:
 - [Surya OCR License](https://github.com/VikParuchuri/surya/blob/master/LICENSE)
 - [GOT-OCR 2.0 GitHub](https://github.com/Ucas-HaoranWei/GOT-OCR2.0)
 - [DeepSeek-OCR GitHub](https://github.com/deepseek-ai/DeepSeek-OCR)
+- [DeepSeek-OCR on HuggingFace](https://huggingface.co/deepseek-ai/DeepSeek-OCR)
+- [DeepSeek-OCR Paper (arXiv)](https://arxiv.org/html/2510.18234v1)
 
 ### Cloud Provider Pricing
 - [Google Cloud Vision Pricing](https://cloud.google.com/vision/pricing)
@@ -504,30 +547,30 @@ Compare TTS output quality based on OCR source:
 ## Implementation Checklist
 
 ### Infrastructure
-- [ ] Create base `OCRProvider` class
-- [ ] Create `OCRResult` dataclass
-- [ ] Create `ProviderRegistry`
+- [x] Create base `OCRProvider` class
+- [x] Create `OCRResult` dataclass
+- [x] Create `ProviderRegistry`
 - [ ] Set up test image collection
 - [ ] Create ground truth files
 - [ ] Build comparison script
 
-### Providers - Local
-- [x] Google Cloud Vision (implemented as cloud)
-- [ ] Tesseract OCR
-- [ ] EasyOCR
-- [ ] PaddleOCR
-- [ ] docTR
-- [ ] Florence-2
-- [ ] Qwen2-VL
-- [ ] Windows OCR
+### Phase A: Local Providers (First)
+- [x] Tesseract OCR
+- [x] EasyOCR
+- [x] PaddleOCR
+- [x] docTR
+- [x] Windows OCR
+- [x] DeepSeek-OCR
+- [x] Florence-2
+- [x] Qwen2-VL
 
-### Providers - Cloud
+### Phase B: Cloud Providers (After Local)
 - [x] Google Cloud Vision
 - [ ] Azure Document Intelligence
 - [ ] AWS Textract
 - [ ] OCR.space
 
-### Providers - LLM Vision
+### Phase C: LLM Vision Providers (Last)
 - [ ] Google Gemini 2.0 Flash
 - [ ] OpenAI GPT-4o / GPT-4o-mini
 - [ ] Anthropic Claude (Haiku / Sonnet)
@@ -549,8 +592,11 @@ Compare TTS output quality based on OCR source:
 ## Next Steps
 
 1. **Implement base classes** (OCRProvider, OCRResult, Registry)
-2. **Implement Tesseract** (most common local)
-3. **Implement Gemini Vision** (shares API key, cheap)
-4. **Build comparison infrastructure**
-5. **Add providers incrementally, testing as we go**
-6. **Generate final comparison report**
+2. **Implement EasyOCR** (next local provider)
+3. **Implement PaddleOCR** (excellent for CJK)
+4. **Implement docTR** (document-focused)
+5. **Implement Windows OCR** (zero-install)
+6. **Implement remaining local providers**
+7. **Build comparison infrastructure**
+8. **Add cloud/LLM providers**
+9. **Generate final comparison report**
