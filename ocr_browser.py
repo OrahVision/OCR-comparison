@@ -22,10 +22,20 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from ocr.database import OCRDatabase
 
-# Cloud providers available for on-demand OCR
+# Cloud/on-demand providers available for selective OCR
+# These cost money or require GPU, so we run them on-demand
 CLOUD_PROVIDERS = {
+    # Cloud APIs
     'google_vision': 'Google Vision',
-    # Add more cloud providers here as needed
+    'gemini_vision': 'Gemini Flash',
+    'claude_vision': 'Claude Haiku',
+    'openai_vision': 'GPT-4o Mini',
+    'azure_doc_intel': 'Azure Doc Intel',
+    'aws_textract': 'AWS Textract',
+    # Local VLMs (require GPU)
+    'deepseek_ocr': 'DeepSeek OCR',
+    'florence2': 'Florence-2',
+    'qwen2vl': 'Qwen2-VL',
 }
 
 
@@ -518,79 +528,178 @@ class OCRBrowser(tk.Tk):
     def _do_cloud_ocr(self, image_path: str, provider_key: str, display_name: str):
         """Perform cloud OCR in background thread."""
         import time
+        import asyncio
 
         try:
+            provider = None
+            start_time = time.perf_counter()
+
+            # Import and create the appropriate provider
             if provider_key == 'google_vision':
                 from ocr.providers.google_vision import GoogleVisionOCR, check_google_cloud_auth
-
-                # Check authentication
                 if not check_google_cloud_auth():
                     self.after(0, lambda: messagebox.showerror(
                         "Authentication Error",
                         "Google Cloud credentials not found.\n\n"
-                        "Please set up authentication via:\n"
-                        "- GOOGLE_APPLICATION_CREDENTIALS environment variable\n"
-                        "- gcloud auth application-default login\n"
-                        "- Keyring storage"
+                        "Set up via GOOGLE_APPLICATION_CREDENTIALS or gcloud auth."
                     ))
                     return
-
-                # Create provider and run OCR
                 provider = GoogleVisionOCR()
-                start_time = time.perf_counter()
 
-                # Run async method synchronously
-                import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    result = loop.run_until_complete(provider.process_image(image_path))
-                finally:
-                    loop.close()
-
-                elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-                # Store result in database
-                self.db.add_ocr_result(
-                    image_id=self.current_image_id,
-                    provider=provider_key,
-                    text=result.text if result.success else "",
-                    confidence=result.confidence if result.success else 0.0,
-                    word_count=result.word_count if result.success else 0,
-                    char_count=result.char_count if result.success else 0,
-                    processing_time_ms=elapsed_ms,
-                    success=result.success,
-                    error=result.error if not result.success else None
-                )
-
-                if result.success:
-                    self.after(0, lambda: self._cloud_ocr_finished(
-                        True,
-                        f"{display_name} completed: {result.word_count} words in {elapsed_ms:.0f}ms",
-                        provider_key
+            elif provider_key == 'gemini_vision':
+                from ocr.providers.gemini_vision import GeminiVisionOCR, get_gemini_api_key
+                if not get_gemini_api_key():
+                    self.after(0, lambda: messagebox.showerror(
+                        "Authentication Error",
+                        "Gemini API key not found.\n\n"
+                        "Set via keyring (gemini/api_key) or GEMINI_API_KEY env var."
                     ))
-                else:
-                    self.after(0, lambda: self._cloud_ocr_finished(
-                        False,
-                        f"{display_name} failed: {result.error}",
-                        provider_key
+                    return
+                provider = GeminiVisionOCR()
+
+            elif provider_key == 'claude_vision':
+                from ocr.providers.claude_vision import ClaudeVisionOCR, get_anthropic_api_key
+                if not get_anthropic_api_key():
+                    self.after(0, lambda: messagebox.showerror(
+                        "Authentication Error",
+                        "Anthropic API key not found.\n\n"
+                        "Set via keyring (anthropic/api_key) or ANTHROPIC_API_KEY env var."
                     ))
+                    return
+                provider = ClaudeVisionOCR()
+
+            elif provider_key == 'openai_vision':
+                from ocr.providers.openai_vision import OpenAIVisionOCR, get_openai_api_key
+                if not get_openai_api_key():
+                    self.after(0, lambda: messagebox.showerror(
+                        "Authentication Error",
+                        "OpenAI API key not found.\n\n"
+                        "Set via keyring (openai/api_key) or OPENAI_API_KEY env var."
+                    ))
+                    return
+                provider = OpenAIVisionOCR()
+
+            elif provider_key == 'azure_doc_intel':
+                from ocr.providers.azure_doc_intel import AzureDocIntelOCR, get_azure_credentials
+                endpoint, key = get_azure_credentials()
+                if not endpoint or not key:
+                    self.after(0, lambda: messagebox.showerror(
+                        "Authentication Error",
+                        "Azure credentials not found.\n\n"
+                        "Set via AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and _KEY env vars."
+                    ))
+                    return
+                provider = AzureDocIntelOCR()
+
+            elif provider_key == 'aws_textract':
+                from ocr.providers.aws_textract import AWSTextractOCR, check_aws_credentials
+                if not check_aws_credentials():
+                    self.after(0, lambda: messagebox.showerror(
+                        "Authentication Error",
+                        "AWS credentials not found.\n\n"
+                        "Set via AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars,\n"
+                        "or configure via: aws configure"
+                    ))
+                    return
+                provider = AWSTextractOCR()
+
+            elif provider_key == 'deepseek_ocr':
+                from ocr.providers.deepseek_ocr import DeepSeekOCRProvider, DEEPSEEK_AVAILABLE
+                if not DEEPSEEK_AVAILABLE:
+                    self.after(0, lambda: messagebox.showerror(
+                        "Not Available",
+                        "DeepSeek OCR requires GPU with 16GB+ VRAM.\n\n"
+                        "Install: pip install transformers torch"
+                    ))
+                    return
+                provider = DeepSeekOCRProvider()
+
+            elif provider_key == 'florence2':
+                from ocr.providers.florence2_provider import Florence2Provider, FLORENCE_AVAILABLE
+                if not FLORENCE_AVAILABLE:
+                    self.after(0, lambda: messagebox.showerror(
+                        "Not Available",
+                        "Florence-2 requires GPU.\n\n"
+                        "Install: pip install transformers torch"
+                    ))
+                    return
+                provider = Florence2Provider()
+
+            elif provider_key == 'qwen2vl':
+                from ocr.providers.qwen2vl_provider import Qwen2VLProvider, QWEN2VL_AVAILABLE
+                if not QWEN2VL_AVAILABLE:
+                    self.after(0, lambda: messagebox.showerror(
+                        "Not Available",
+                        "Qwen2-VL requires GPU.\n\n"
+                        "Install: pip install transformers torch qwen-vl-utils"
+                    ))
+                    return
+                provider = Qwen2VLProvider()
 
             else:
                 self.after(0, lambda: messagebox.showerror(
                     "Error",
-                    f"Unknown cloud provider: {provider_key}"
+                    f"Unknown provider: {provider_key}"
+                ))
+                return
+
+            # Check if provider initialized successfully
+            if not provider.is_available():
+                error = getattr(provider, '_init_error', 'Provider not available')
+                self.after(0, lambda e=error: messagebox.showerror(
+                    "Not Available",
+                    f"{display_name} is not available:\n{e}"
+                ))
+                return
+
+            # Run OCR
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(provider.process_image(image_path))
+            finally:
+                loop.close()
+
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+            # Store result in database
+            self.db.add_ocr_result(
+                image_id=self.current_image_id,
+                provider=provider_key,
+                text=result.text if result.success else "",
+                confidence=result.confidence if result.success else 0.0,
+                word_count=result.word_count if result.success else 0,
+                char_count=result.char_count if result.success else 0,
+                processing_time_ms=elapsed_ms,
+                success=result.success,
+                error=result.error if not result.success else None
+            )
+
+            if result.success:
+                cost_info = ""
+                if hasattr(result, 'estimated_cost_usd') and result.estimated_cost_usd:
+                    cost_info = f", ${result.estimated_cost_usd:.4f}"
+                self.after(0, lambda: self._cloud_ocr_finished(
+                    True,
+                    f"{display_name}: {result.word_count} words in {elapsed_ms:.0f}ms{cost_info}",
+                    provider_key
+                ))
+            else:
+                self.after(0, lambda: self._cloud_ocr_finished(
+                    False,
+                    f"{display_name} failed: {result.error}",
+                    provider_key
                 ))
 
         except ImportError as e:
             self.after(0, lambda: messagebox.showerror(
                 "Import Error",
-                f"Cloud provider not available: {e}"
+                f"Provider not installed: {e}"
             ))
         except Exception as e:
             self.after(0, lambda: messagebox.showerror(
                 "Error",
-                f"Cloud OCR failed: {e}"
+                f"OCR failed: {e}"
             ))
         finally:
             self.after(0, lambda: self.btn_cloud_ocr.config(state=tk.NORMAL))
